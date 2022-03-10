@@ -1,0 +1,122 @@
+version: '3'
+
+services:
+
+  # proxy server that is going to serve all the websites
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+# in case you want to customize nginx then uncomment and modify the file in ./proxy/conf.d
+      - ./proxy/conf.d/custom_proxy_settings.conf:/etc/nginx/conf.d/custom_proxy_settings.conf:ro
+      - ./proxy/certs:/etc/nginx/certs
+      - ./proxy/vhost.d:/etc/nginx/vhost.d
+      - ./proxy/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    restart: always
+
+  # let's encrypt will automatically issue certificates
+  letsencrypt-companion:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: letsencrypt-companion
+    environment:
+      NGINX_PROXY_CONTAINER: nginx-proxy
+    volumes:
+      - ./proxy/certs:/etc/nginx/certs
+      - ./proxy/vhost.d:/etc/nginx/vhost.d
+      - ./proxy/html:/usr/share/nginx/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: always
+
+  # NEW EnglishRealm
+  # Database
+  db:
+    image: mysql:5.7
+    depends_on:
+      - nginx-proxy
+      - letsencrypt-companion
+    volumes:
+      - /var/dockmounts/wordpress/englishrealm/dbnew:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: engliua4_ss_dbname78e
+      MYSQL_USER: engliua4_ss_d78e
+      MYSQL_PASSWORD: 4WpM3zk3fhot
+
+
+  fix-wordpress-volume-ownership:
+    image: 'wordpress:php7.4-apache'
+    user: root
+    command: chown -R www-data:www-data /var/www/html
+    volumes:
+      - '/var/dockmounts/wordpress/englishrealm/htmlnew:/var/www/html'
+
+  # Wordpress
+  wordpress:
+    depends_on:
+      - db
+      - fix-wordpress-volume-ownership
+    image: wordpress:php7.4-apache
+    restart: always
+    # this is only necessary for php apache containers
+    hostname: englishrealm.ca
+    volumes:
+      - /var/dockmounts/wordpress/englishrealm/htmlnew:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: engliua4_ss_dbname78e
+      WORDPRESS_DB_USER: engliua4_ss_d78e
+      WORDPRESS_DB_PASSWORD: 4WpM3zk3fhot
+      VIRTUAL_HOST: englishrealm.ca,www.englishrealm.ca
+      VIRTUAL_PORT: 80
+      LETSENCRYPT_HOST: englishrealm.ca,www.englishrealm.ca
+      LETSENCRYPT_EMAIL: armenic@gmail.com
+
+  # elumatesol.org
+  # Database
+  db_elumatesolorg:
+    image: mysql:5.7
+    depends_on:
+      - nginx-proxy
+      - letsencrypt-companion
+    volumes:
+      - /var/dockmounts/wordpress/elumatesolorg/db:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: elumatesolorg_ss_dbname79e
+      MYSQL_USER: elumatesolorg_ss_d79e
+      MYSQL_PASSWORD: 8WpM3zp3fhot
+
+  fix-wordpress-volume-ownership-elumatesolorg:
+    image: 'wordpress:latest'
+    user: root
+    command: chown -R www-data:www-data /var/www/html
+    volumes:
+      - '/var/dockmounts/wordpress/elumatesolorg/html:/var/www/html'
+
+  # Wordpress
+  wordpress_elumatesolorg:
+    depends_on:
+      - db_elumatesolorg
+      - fix-wordpress-volume-ownership-elumatesolorg
+    image: 'wordpress:latest'
+    restart: always
+    # this is only necessary for php apache containers
+    hostname: elumatesol.org
+    volumes:
+      - /var/dockmounts/wordpress/elumatesolorg/html:/var/www/html
+    environment:
+      WORDPRESS_DB_HOST: db_elumatesolorg:3306
+      WORDPRESS_DB_NAME: elumatesolorg_ss_dbname79e
+      WORDPRESS_DB_USER: elumatesolorg_ss_d79e
+      WORDPRESS_DB_PASSWORD: 8WpM3zp3fhot
+      VIRTUAL_HOST: elumatesol.org,www.elumatesol.org
+      VIRTUAL_PORT: 80
+      LETSENCRYPT_HOST: elumatesol.org,www.elumatesol.org
+      LETSENCRYPT_EMAIL: armenic@gmail.com
+
